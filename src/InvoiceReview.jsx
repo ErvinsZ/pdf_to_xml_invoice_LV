@@ -148,9 +148,15 @@ const serif = { fontFamily: "'Lora', serif" };
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 const sans = { fontFamily: "'Spline Sans', sans-serif" };
 
+/* Backend URL comes from the build-time env var VITE_API_BASE (set in .env
+ * locally and in Vercel's project settings). The gear-icon field stays as an
+ * optional override but is pre-filled, so the user never has to paste it. */
+const DEFAULT_API_BASE =
+  (import.meta.env && import.meta.env.VITE_API_BASE) || "";
+
 export default function InvoiceReview() {
   const [ext, setExt] = useState(null);
-  const [apiBase, setApiBase] = useState("");
+  const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [showSettings, setShowSettings] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfName, setPdfName] = useState(null);
@@ -182,7 +188,7 @@ export default function InvoiceReview() {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(URL.createObjectURL(file));
     setServerProblems(null);
-    if (!apiBase) { setToast({ kind: "error", msg: "Set an API base (gear icon) before uploading — extraction runs on the server." }); return; }
+    if (!apiBase) { setToast({ kind: "error", msg: "Backend URL is not configured. Set VITE_API_BASE in the environment, or enter it via the gear icon." }); return; }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -201,7 +207,7 @@ export default function InvoiceReview() {
   const onGenerate = async () => {
     setServerProblems(null);
     if (!ext) return;
-    if (!apiBase) { setToast({ kind: "error", msg: "Set an API base before generating — XML is produced by the server." }); return; }
+    if (!apiBase) { setToast({ kind: "error", msg: "Backend URL is not configured. Set VITE_API_BASE in the environment, or enter it via the gear icon." }); return; }
     setBusy(true);
     try {
       const res = await fetch(`${apiBase.replace(/\/$/, "")}/generate`, {
@@ -263,11 +269,13 @@ export default function InvoiceReview() {
 
       {showSettings && (
         <div className="flex items-center gap-2.5 flex-wrap px-5 py-2.5 border-b border-[#e2ddd0]" style={{ background: LINESOFT }}>
-          <label className="text-[11px] text-[#6f6a5f] font-medium">FastAPI base URL</label>
+          <label className="text-[11px] text-[#6f6a5f] font-medium">Backend URL (optional override)</label>
           <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="https://your-host"
             className="flex-1 min-w-[220px] text-[13.5px] bg-white border border-[#e2ddd0] rounded-md px-2.5 h-9 outline-none focus:ring-2 focus:ring-[#e4d4ac]" />
           <span className="text-xs text-[#6f6a5f]">
-            {apiBase ? "uploads → /extract · generate → /generate" : "required before uploading or generating"}
+            {apiBase
+              ? (apiBase === DEFAULT_API_BASE ? "configured from environment" : "using manual override")
+              : "not configured — set VITE_API_BASE or enter a URL here"}
           </span>
         </div>
       )}
