@@ -232,6 +232,7 @@ export default function InvoiceReview() {
     });
 
   const onPickFile = async (e) => {
+    setExt(null)
     const file = e.target.files?.[0];
     if (!file) return;
     setPdfName(file.name);
@@ -254,7 +255,7 @@ export default function InvoiceReview() {
       const n = (data.extraction ?? data)?.lines?.length ?? 0;
       setToast({ kind: "info", msg: `Nolasītas ${n} rinda${n === 1 ? "" : "s"} — pārbaudiet zemāk.` });
     } catch (err) {
-      setToast({ kind: "error", msg: `Nolasīšana neizdevās: ${err.message}` });
+      setToast({ kind: "error", msg: `${err.message === 'extract 429' ? "Gemini pieprasījumu limits sasniegts" : "Servera kļūda"}` });
     } finally { setBusy(false); }
   };
 
