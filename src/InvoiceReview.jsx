@@ -79,7 +79,7 @@ function reconcile(ext) {
     if (Math.abs(r2(lineNet[i]) - r2(printed)) > LINE_TOL) {
       flags.push({
         level: "error", code: "LINE_MISMATCH", line: i,
-        message: `Line ${i + 1}: qty×price = ${money(lineNet[i])} but invoice shows ${money(printed)}.`,
+        message: `${i + 1}. rinda: daudz.×cena = ${money(lineNet[i])}, bet rēķinā norādīts ${money(printed)}.`,
       });
       addLineFlag(i, "error");
     }
@@ -119,25 +119,45 @@ function reconcile(ext) {
   const pTot = num(pick(pt, KEY.totPrinted));
 
   if (Number.isFinite(net) && Number.isFinite(pNet) && Math.abs(net - pNet) > DOC_TOL)
-    flags.push({ level: "error", code: "NET_MISMATCH", message: `Computed net ${money(net)} vs printed ${money(pNet)} (Δ ${money(Math.abs(net - pNet))}).` });
+    flags.push({ level: "error", code: "NET_MISMATCH", message: `Aprēķinātā summa bez PVN ${money(net)} pret rēķinā norādīto ${money(pNet)} (Δ ${money(Math.abs(net - pNet))}).` });
   if (Number.isFinite(vat) && Number.isFinite(pVat) && Math.abs(vat - pVat) > DOC_TOL)
-    flags.push({ level: "warning", code: "VAT_MISMATCH", message: `Computed VAT ${money(vat)} vs printed ${money(pVat)} (Δ ${money(Math.abs(vat - pVat))}).` });
+    flags.push({ level: "warning", code: "VAT_MISMATCH", message: `Aprēķinātais PVN ${money(vat)} pret rēķinā norādīto ${money(pVat)} (Δ ${money(Math.abs(vat - pVat))}).` });
   if (Number.isFinite(total) && Number.isFinite(pTot) && Math.abs(total - pTot) > DOC_TOL)
-    flags.push({ level: "error", code: "TOTAL_MISMATCH", message: `Computed total ${money(total)} vs printed ${money(pTot)} (Δ ${money(Math.abs(total - pTot))}).` });
+    flags.push({ level: "error", code: "TOTAL_MISMATCH", message: `Aprēķinātā kopsumma ${money(total)} pret rēķinā norādīto ${money(pTot)} (Δ ${money(Math.abs(total - pTot))}).` });
 
   const cust = ext.customer || {};
   if (cust && (cust.vat_number !== undefined || cust.reg_number !== undefined) && !cust.vat_number && !cust.reg_number)
-    flags.push({ level: "error", code: "NO_RECIPIENT_ID", message: "Recipient has no VAT / registration number — Horizon cannot match the company." });
+    flags.push({ level: "error", code: "NO_RECIPIENT_ID", message: "Saņēmējam nav PVN / reģistrācijas numura — Horizon nevarēs atrast uzņēmumu." });
   if (lines.length === 0)
-    flags.push({ level: "warning", code: "NO_LINES", message: "No line items in the extraction." });
+    flags.push({ level: "warning", code: "NO_LINES", message: "Datos nav neviena rēķina rinda." });
 
   return { flags, lineLevel, net, vat, total, pNet, pVat, pTot, lineNet };
 }
 
 /* ---------- display helpers for arbitrary keys */
+const LV_LABELS = {
+  // top-level
+  invoice_id: "Rēķina nr.", issue_date: "Izrakstīšanas datums", due_date: "Apmaksas termiņš",
+  currency: "Valūta", buyer_reference: "Pircēja atsauce", contract_reference: "Līguma atsauce",
+  delivery_date: "Piegādes datums", note: "Piezīme",
+  // party containers
+  supplier: "Piegādātājs", customer: "Saņēmējs", delivery: "Piegāde", payment: "Maksājums",
+  // party fields
+  name: "Nosaukums", reg_number: "Reģ. nr.", vat_number: "PVN nr.",
+  street: "Iela", city: "Pilsēta", postal_zone: "Pasta indekss", country_code: "Valsts kods",
+  contact_name: "Kontaktpersona", contact_phone: "Tālrunis", contact_email: "E-pasts",
+  iban: "IBAN", bic: "BIC", bank_name: "Banka", payment_id: "Maksājuma ID", terms_note: "Apmaksas noteikumi",
+  // line fields
+  description: "Apraksts", seller_item_id: "Artikuls", quantity: "Daudzums", unit_code: "Mērv.",
+  net_unit_price: "Cena bez PVN", vat_category: "PVN kat.", vat_percent: "PVN %",
+  printed_line_total: "Summa (rēķinā)",
+  // printed totals
+  net_excl_vat: "Summa bez PVN", total_vat: "PVN kopā", grand_total_incl_vat: "Summa kopā",
+};
 const labelize = (k) =>
+  LV_LABELS[k] ||
   k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    .replace(/\bVat\b/i, "VAT").replace(/\bIban\b/i, "IBAN").replace(/\bBic\b/i, "BIC").replace(/\bId\b/i, "ID");
+    .replace(/\bVat\b/i, "PVN").replace(/\bIban\b/i, "IBAN").replace(/\bBic\b/i, "BIC").replace(/\bId\b/i, "ID");
 const isScalar = (v) => v === null || ["string", "number", "boolean"].includes(typeof v);
 
 /* ---------- warm palette applied via inline style (no Tailwind token for these) */
@@ -218,7 +238,7 @@ export default function InvoiceReview() {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     setPdfUrl(URL.createObjectURL(file));
     setServerProblems(null);
-    if (!apiBase) { setToast({ kind: "error", msg: "Backend URL is not configured. Set VITE_API_BASE in the environment, or enter it via the gear icon." }); return; }
+    if (!apiBase) { setToast({ kind: "error", msg: "Servera adrese nav konfigurēta. Iestatiet VITE_API_BASE vidē vai ievadiet to zem zobrata ikonas." }); return; }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -226,30 +246,30 @@ export default function InvoiceReview() {
       const res = await fetchWithWakeRetry(
         `${apiBase.replace(/\/$/, "")}/extract`,
         { method: "POST", body: fd },
-        { onWake: () => setToast({ kind: "info", msg: "Waking up the server — this can take up to a minute on the first request…" }) }
+        { onWake: () => setToast({ kind: "info", msg: "Serveris tiek aktivizēts — pirmais pieprasījums var ilgt līdz minūtei…" }) }
       );
       if (!res.ok) throw new Error(`extract ${res.status}`);
       const data = await res.json();
       setExt(data.extraction ?? data);
       const n = (data.extraction ?? data)?.lines?.length ?? 0;
-      setToast({ kind: "info", msg: `Extracted ${n} line${n === 1 ? "" : "s"} — review below.` });
+      setToast({ kind: "info", msg: `Nolasītas ${n} rinda${n === 1 ? "" : "s"} — pārbaudiet zemāk.` });
     } catch (err) {
-      setToast({ kind: "error", msg: `Extraction failed: ${err.message}` });
+      setToast({ kind: "error", msg: `Nolasīšana neizdevās: ${err.message}` });
     } finally { setBusy(false); }
   };
 
   const onGenerate = async () => {
     setServerProblems(null);
     if (!ext) return;
-    if (!apiBase) { setToast({ kind: "error", msg: "Backend URL is not configured. Set VITE_API_BASE in the environment, or enter it via the gear icon." }); return; }
+    if (!apiBase) { setToast({ kind: "error", msg: "Servera adrese nav konfigurēta. Iestatiet VITE_API_BASE vidē vai ievadiet to zem zobrata ikonas." }); return; }
     setBusy(true);
     try {
       const res = await fetchWithWakeRetry(
         `${apiBase.replace(/\/$/, "")}/generate`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ext) },
-        { onWake: () => setToast({ kind: "info", msg: "Waking up the server — this can take up to a minute…" }) }
+        { onWake: () => setToast({ kind: "info", msg: "Serveris tiek aktivizēts — tas var ilgt līdz minūtei…" }) }
       );
-      if (res.status === 422) { setServerProblems(await res.json()); setToast({ kind: "error", msg: "Server rejected the invoice — see problems below." }); return; }
+      if (res.status === 422) { setServerProblems(await res.json()); setToast({ kind: "error", msg: "Serveris noraidīja rēķinu — skatiet problēmas zemāk." }); return; }
       if (!res.ok) throw new Error(`generate ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -258,9 +278,9 @@ export default function InvoiceReview() {
       a.download = `${(ext.invoice_id || "invoice").toString().replace(/\s+/g, "_")}.xml`;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ kind: "ok", msg: "XML generated and downloaded." });
+      setToast({ kind: "ok", msg: "XML izveidots un lejupielādēts." });
     } catch (err) {
-      setToast({ kind: "error", msg: `Generation failed: ${err.message}` });
+      setToast({ kind: "error", msg: `Izveide neizdevās: ${err.message}` });
     } finally { setBusy(false); }
   };
 
@@ -289,7 +309,7 @@ export default function InvoiceReview() {
           <span className="text-[25px] font-semibold tracking-tight leading-none" style={serif}>Pavadzīme</span>
           <ArrowRight size={16} className="self-center text-[#6f6a5f]" />
           <span className="text-[25px] font-semibold tracking-tight leading-none text-[#a3331f]" style={serif}>Peppol</span>
-          <span className="text-[12.5px] text-[#6f6a5f] self-center">e-invoice review · Horizon</span>
+          <span className="text-[12.5px] text-[#6f6a5f] self-center">e-rēķinu pārbaude · Horizon</span>
         </div>
         <div className="flex items-center gap-2.5">
           <button onClick={() => setShowSettings((v) => !v)}
@@ -298,20 +318,20 @@ export default function InvoiceReview() {
           </button>
           <button onClick={onGenerate} disabled={busy || !ext}
             className="inline-flex items-center gap-1.5 bg-[#1c1b17] text-[#f4f1ea] border-0 rounded-lg px-3.5 py-2 text-[13.5px] font-medium disabled:opacity-50 disabled:cursor-default cursor-pointer active:scale-[0.98] transition-transform">
-            {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Generate XML
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Izveidot XML
           </button>
         </div>
       </header>
 
       {showSettings && (
         <div className="flex items-center gap-2.5 flex-wrap px-5 py-2.5 border-b border-[#e2ddd0]" style={{ background: LINESOFT }}>
-          <label className="text-[11px] text-[#6f6a5f] font-medium">Backend URL (optional override)</label>
+          <label className="text-[11px] text-[#6f6a5f] font-medium">Servera adrese (neobligāts uzstādījums)</label>
           <input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="https://your-host"
             className="flex-1 min-w-[220px] text-[13.5px] bg-white border border-[#e2ddd0] rounded-md px-2.5 h-9 outline-none focus:ring-2 focus:ring-[#e4d4ac]" />
           <span className="text-xs text-[#6f6a5f]">
             {apiBase
-              ? (apiBase === DEFAULT_API_BASE ? "configured from environment" : "using manual override")
-              : "not configured — set VITE_API_BASE or enter a URL here"}
+              ? (apiBase === DEFAULT_API_BASE ? "konfigurēts no vides" : "izmanto manuālu adresi")
+              : "nav konfigurēts — iestatiet VITE_API_BASE vai ievadiet adresi šeit"}
           </span>
         </div>
       )}
@@ -327,10 +347,10 @@ export default function InvoiceReview() {
         {/* left: PDF */}
         <aside className="flex-[1_1_300px] min-w-[280px] border-r border-[#e2ddd0] flex flex-col min-h-[480px]" style={{ background: LINESOFT }}>
           <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[#e2ddd0]">
-            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#1c1b17]"><FileText size={15} /> Source document</span>
+            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#1c1b17]"><FileText size={15} /> Avota dokuments</span>
             <button onClick={() => fileRef.current?.click()}
               className="inline-flex items-center gap-1.5 bg-white text-[#1c1b17] border border-[#e2ddd0] rounded-md px-2.5 py-1.5 text-xs font-medium hover:bg-[#ece8dd] transition-colors">
-              <Upload size={13} /> {pdfName ? "Replace" : "Upload PDF"}
+              <Upload size={13} /> {pdfName ? "Aizstāt" : "Augšupielādēt PDF"}
             </button>
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={onPickFile} />
           </div>
@@ -339,9 +359,9 @@ export default function InvoiceReview() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
               <FileText size={30} className="text-[#e2ddd0]" />
-              <p className="mt-2.5 mb-0.5 font-medium text-[#1c1b17]">No document</p>
+              <p className="mt-2.5 mb-0.5 font-medium text-[#1c1b17]">Nav dokumenta</p>
               <p className="m-0 text-[12.5px] text-[#6f6a5f] max-w-[230px] leading-relaxed">
-                Upload an invoice PDF to extract it. The page preview appears here next to the extracted data.
+                Augšupielādējiet rēķina PDF, lai to nolasītu. Dokumenta priekšskatījums parādīsies šeit blakus nolasītajiem datiem.
               </p>
             </div>
           )}
@@ -355,9 +375,9 @@ export default function InvoiceReview() {
                 <Loader2 size={100} className="animate-spin text-[#6f6a5f]" />
               ) : (
                 <>
-                  <h2 className="text-[19px] font-semibold mt-3.5 mb-0 text-[#1c1b17]" style={serif}>Nothing to review yet</h2>
+                  <h2 className="text-[19px] font-semibold mt-3.5 mb-0 text-[#1c1b17]" style={serif}>Vēl nav ko pārbaudīt</h2>
                   <p className="mt-2 mb-0 text-[#6f6a5f] text-[13.5px] leading-relaxed max-w-[360px]">
-                    Upload a PDF to run extraction. The extracted fields and line items will appear here for you to check and correct before generating the Peppol XML.
+                    Augšupielādējiet PDF, lai sāktu nolasīšanu. Nolasītie lauki un rindas parādīsies šeit pārbaudei un labošanai pirms Peppol XML izveides.
                   </p>
                 </>
               )}
@@ -374,8 +394,8 @@ export default function InvoiceReview() {
 
               {serverProblems && (
                 <div className="flex flex-col gap-1.5">
-                  {(serverProblems.reconcile_errors || []).map((f, i) => <FlagRow key={`re${i}`} level="error" text={`Server: ${f.message}`} />)}
-                  {(serverProblems.validation_errors || []).map((m, i) => <FlagRow key={`ve${i}`} level="error" text={`Validation: ${m}`} />)}
+                  {(serverProblems.reconcile_errors || []).map((f, i) => <FlagRow key={`re${i}`} level="error" text={`Serveris: ${f.message}`} />)}
+                  {(serverProblems.validation_errors || []).map((m, i) => <FlagRow key={`ve${i}`} level="error" text={`Validācija: ${m}`} />)}
                   {(serverProblems.validation_warnings || []).map((m, i) => <FlagRow key={`vw${i}`} level="warning" text={m} />)}
                 </div>
               )}
@@ -398,7 +418,7 @@ export default function InvoiceReview() {
                 const scalarKeys = Object.keys(ext).filter((k) => isScalar(ext[k]) && k !== "note");
                 if (scalarKeys.length === 0) return null;
                 return (
-                  <Section title="Invoice details">
+                  <Section title="Rēķina informācija">
                     <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
                       {scalarKeys.map((k) => <Field key={k} label={labelize(k)} value={ext[k]} onChange={(v) => setTop(k, v)} />)}
                     </div>
@@ -407,18 +427,18 @@ export default function InvoiceReview() {
               })()}
 
               {ext.note !== undefined && isScalar(ext.note) && (
-                <Section title="Note">
+                <Section title="Piezīme">
                   <textarea value={ext.note ?? ""} onChange={(e) => setTop("note", e.target.value)}
                     className="w-full h-[70px] text-[13.5px] bg-white border border-[#e2ddd0] rounded-md px-2.5 pt-2 resize-y outline-none focus:ring-2 focus:ring-[#e4d4ac]" />
                 </Section>
               )}
 
               {/* lines */}
-              <Section title={`Line items · ${lines.length}`}
+              <Section title={`Rēķina rindas · ${lines.length}`}
                 action={lines.length > 0 ? <AddBtn onClick={addLine} /> : null}>
                 {lines.length === 0 ? (
                   <div className="text-[13px] text-[#6f6a5f] px-3.5 py-3 border border-[#e2ddd0] rounded-lg" style={{ background: PANEL }}>
-                    No line items were returned by extraction.
+                    Nolasīšana neatgrieza nevienu rindu.
                   </div>
                 ) : (
                   <div className="border border-[#e2ddd0] rounded-lg overflow-auto" style={{ background: PANEL }}>
@@ -431,7 +451,7 @@ export default function InvoiceReview() {
                               {labelize(k)}
                             </th>
                           ))}
-                          {qtyKey && priceKey && <th className="w-[76px] text-[10.5px] font-medium text-[#6f6a5f] uppercase tracking-wide px-1.5 py-2 border-b border-[#e2ddd0] text-right" style={{ background: LINESOFT }}>= Line</th>}
+                          {qtyKey && priceKey && <th className="w-[76px] text-[10.5px] font-medium text-[#6f6a5f] uppercase tracking-wide px-1.5 py-2 border-b border-[#e2ddd0] text-right" style={{ background: LINESOFT }}>= Rinda</th>}
                           <th className="w-[30px] border-b border-[#e2ddd0]" style={{ background: LINESOFT }} />
                         </tr>
                       </thead>
@@ -469,7 +489,7 @@ export default function InvoiceReview() {
                                 </td>
                               )}
                               <td className="px-0.5 py-0.5 text-center border-b border-[#ece8dd] align-middle">
-                                <button onClick={() => removeLine(i)} aria-label="remove line"
+                                <button onClick={() => removeLine(i)} aria-label="dzēst rindu"
                                   className="inline-flex items-center justify-center bg-transparent text-[#6f6a5f] border-0 rounded p-1.5 cursor-pointer hover:text-[#a3331f] transition-colors">
                                   <Trash2 size={13} />
                                 </button>
@@ -485,15 +505,15 @@ export default function InvoiceReview() {
 
               {/* totals */}
               {(ext.printed_totals || Number.isFinite(rec.net)) && (
-                <Section title="Totals — computed vs printed">
+                <Section title="Kopsummas — aprēķinātās pret rēķinā norādītajām">
                   <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-                    <TotalCell label="Net (excl. VAT)" computed={rec.net} printed={rec.pNet} />
-                    <TotalCell label="VAT" computed={rec.vat} printed={rec.pVat} />
-                    <TotalCell label="Total payable" computed={rec.total} printed={rec.pTot} strong />
+                    <TotalCell label="Summa bez PVN" computed={rec.net} printed={rec.pNet} />
+                    <TotalCell label="PVN" computed={rec.vat} printed={rec.pVat} />
+                    <TotalCell label="Summa kopā" computed={rec.total} printed={rec.pTot} strong />
                   </div>
                   {ext.printed_totals && (
                     <div className="flex items-center gap-3 flex-wrap mt-2.5">
-                      <span className="text-[11px] text-[#6f6a5f] font-medium">Printed (from invoice):</span>
+                      <span className="text-[11px] text-[#6f6a5f] font-medium">Rēķinā norādīts:</span>
                       {Object.keys(ext.printed_totals).filter((k) => isScalar(ext.printed_totals[k])).map((k) => (
                         <MiniField key={k} label={labelize(k)} value={ext.printed_totals[k]} onChange={(v) => setNested("printed_totals", k, v)} />
                       ))}
@@ -527,8 +547,12 @@ function StatusBanner({ errorCount, warnCount }) {
   const onlyWarn = errorCount === 0 && warnCount > 0;
   const cls = ok ? "bg-[#e7f0e9] text-[#2f6b4f]" : onlyWarn ? "bg-[#f6efdf] text-[#946317]" : "bg-[#f6e9e4] text-[#a3331f]";
   const Icon = ok ? CheckCircle2 : onlyWarn ? AlertTriangle : AlertCircle;
-  const msg = ok ? "Reconciled — figures match the printed totals."
-    : `${errorCount ? `${errorCount} error${errorCount > 1 ? "s" : ""}` : ""}${errorCount && warnCount ? " · " : ""}${warnCount ? `${warnCount} warning${warnCount > 1 ? "s" : ""}` : ""} to review.`;
+  // Latvian plural: n ending in 1 (but not 11) = singular form
+  const lvPlural = (n, one, many) => (n % 10 === 1 && n % 100 !== 11 ? one : many);
+  const errTxt = errorCount ? `${errorCount} ${lvPlural(errorCount, "kļūda", "kļūdas")}` : "";
+  const warnTxt = warnCount ? `${warnCount} ${lvPlural(warnCount, "brīdinājums", "brīdinājumi")}` : "";
+  const msg = ok ? "Saskaņots — summas atbilst rēķinā norādītajām."
+    : `${errTxt}${errorCount && warnCount ? " · " : ""}${warnTxt} jāpārbauda.`;
   return (
     <div className={`flex items-center gap-2.5 px-3.5 py-3 rounded-lg font-medium text-sm ${cls}`}>
       <Icon size={17} /> {msg}
@@ -552,7 +576,7 @@ function AddBtn({ onClick }) {
   return (
     <button onClick={onClick}
       className="inline-flex items-center gap-1.5 bg-white text-[#1c1b17] border border-[#e2ddd0] rounded-md px-2.5 py-1.5 text-xs font-medium hover:bg-[#ece8dd] transition-colors">
-      <Plus size={13} /> Add line
+      <Plus size={13} /> Pievienot rindu
     </button>
   );
 }
@@ -562,7 +586,7 @@ function ObjectCard({ title, obj, flagged, onChange }) {
   return (
     <div className={`border rounded-xl p-3.5 flex flex-col gap-2.5 ${flagged ? "border-[#e3c4b9] bg-[#f6e9e4]" : "border-[#e2ddd0]"}`} style={flagged ? undefined : { background: PANEL }}>
       <div className="flex items-center justify-between text-[14.5px] font-semibold text-[#1c1b17]" style={serif}>
-        {title}{flagged && <span className="text-[#a3331f] text-[11px] font-medium">missing ID</span>}
+        {title}{flagged && <span className="text-[#a3331f] text-[11px] font-medium">trūkst ID</span>}
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         {keys.map((k) => (
