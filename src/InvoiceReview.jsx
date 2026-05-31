@@ -244,7 +244,7 @@ export default function InvoiceReview() {
       {/* masthead */}
       <header className="flex items-center justify-between gap-3 flex-wrap px-5 py-4 border-b border-[#e2ddd0]" style={{ background: PANEL }}>
         <div className="flex items-baseline gap-3.5 flex-wrap">
-          <span className="text-[25px] font-semibold tracking-tight leading-none" style={serif}>Invoice</span>
+          <span className="text-[25px] font-semibold tracking-tight leading-none" style={serif}>Pavadzīme</span>
           <ArrowRight size={16} className="self-center text-[#6f6a5f]" />
           <span className="text-[25px] font-semibold tracking-tight leading-none text-[#a3331f]" style={serif}>Peppol</span>
           <span className="text-[12.5px] text-[#6f6a5f] self-center">e-invoice review · Horizon</span>
