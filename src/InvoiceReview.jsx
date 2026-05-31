@@ -154,6 +154,36 @@ const sans = { fontFamily: "'Spline Sans', sans-serif" };
 const DEFAULT_API_BASE =
   (import.meta.env && import.meta.env.VITE_API_BASE) || "";
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Free-tier hosts (Render) sleep after inactivity; the first request wakes the
+ * container and can return 502/503/504 or fail outright for ~30-50s. Retry a
+ * few times so the cold start is invisible to the user. onWake fires once when
+ * we detect we're waiting for the server to come up. */
+async function fetchWithWakeRetry(url, options, { retries = 4, delayMs = 6000, onWake } = {}) {
+  let notified = false;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if ([502, 503, 504].includes(res.status) && attempt < retries) {
+        if (!notified && onWake) { onWake(); notified = true; }
+        await sleep(delayMs);
+        continue;
+      }
+      return res;
+    } catch (err) {
+      // network-level failure (server not answering yet) — retry if we can
+      if (attempt < retries) {
+        if (!notified && onWake) { onWake(); notified = true; }
+        await sleep(delayMs);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("server did not respond after several attempts");
+}
+
 export default function InvoiceReview() {
   const [ext, setExt] = useState(null);
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
@@ -193,7 +223,11 @@ export default function InvoiceReview() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`${apiBase.replace(/\/$/, "")}/extract`, { method: "POST", body: fd });
+      const res = await fetchWithWakeRetry(
+        `${apiBase.replace(/\/$/, "")}/extract`,
+        { method: "POST", body: fd },
+        { onWake: () => setToast({ kind: "info", msg: "Waking up the server — this can take up to a minute on the first request…" }) }
+      );
       if (!res.ok) throw new Error(`extract ${res.status}`);
       const data = await res.json();
       setExt(data.extraction ?? data);
@@ -210,9 +244,11 @@ export default function InvoiceReview() {
     if (!apiBase) { setToast({ kind: "error", msg: "Backend URL is not configured. Set VITE_API_BASE in the environment, or enter it via the gear icon." }); return; }
     setBusy(true);
     try {
-      const res = await fetch(`${apiBase.replace(/\/$/, "")}/generate`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ext),
-      });
+      const res = await fetchWithWakeRetry(
+        `${apiBase.replace(/\/$/, "")}/generate`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ext) },
+        { onWake: () => setToast({ kind: "info", msg: "Waking up the server — this can take up to a minute…" }) }
+      );
       if (res.status === 422) { setServerProblems(await res.json()); setToast({ kind: "error", msg: "Server rejected the invoice — see problems below." }); return; }
       if (!res.ok) throw new Error(`generate ${res.status}`);
       const blob = await res.blob();
