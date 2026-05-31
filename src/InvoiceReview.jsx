@@ -315,17 +315,16 @@ export default function InvoiceReview() {
         <main className="flex-[2_1_440px] min-w-[360px] px-5 py-4 flex flex-col gap-4 max-h-[760px] overflow-y-auto">
           {!ext ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
-              <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center" style={{ background: LINESOFT }}>
-                <Upload size={22} className="text-[#6f6a5f]" />
-              </div>
-              <h2 className="text-[19px] font-semibold mt-3.5 mb-0 text-[#1c1b17]" style={serif}>Nothing to review yet</h2>
-              <p className="mt-2 mb-0 text-[#6f6a5f] text-[13.5px] leading-relaxed max-w-[360px]">
-                Upload a PDF to run extraction. The extracted fields and line items will appear here for you to check and correct before generating the Peppol XML.
-              </p>
-              <button onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-1.5 bg-[#1c1b17] text-[#f4f1ea] rounded-lg px-3.5 py-2 text-[13.5px] font-medium mt-4 cursor-pointer active:scale-[0.98] transition-transform">
-                <Upload size={15} /> Upload invoice
-              </button>
+              {busy ? (
+                <Loader2 size={100} className="animate-spin text-[#6f6a5f]" />
+              ) : (
+                <>
+                  <h2 className="text-[19px] font-semibold mt-3.5 mb-0 text-[#1c1b17]" style={serif}>Nothing to review yet</h2>
+                  <p className="mt-2 mb-0 text-[#6f6a5f] text-[13.5px] leading-relaxed max-w-[360px]">
+                    Upload a PDF to run extraction. The extracted fields and line items will appear here for you to check and correct before generating the Peppol XML.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <>
