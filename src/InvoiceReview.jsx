@@ -176,6 +176,37 @@ const DEFAULT_API_BASE =
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* Poll /health while extraction is running so the user sees live status
+ * instead of a silent spinner. Runs concurrently with the /extract call;
+ * cancelled via AbortController when extraction finishes. */
+async function pollHealth(url, onLog, signal) {
+  onLog("Pārbauda savienojumu...", "pending");
+  let attempt = 0;
+  while (!signal.aborted && attempt < 20) {
+    if (attempt > 0) await sleep(4000);
+    if (signal.aborted) break;
+    try {
+      const res = await fetch(url, { signal });
+      if (signal.aborted) break;
+      if (res.ok) {
+        const data = await res.json().catch(() => ({ status: "ok" }));
+        onLog(`Serveris darbojas — ${data.status}`, "ok");
+        return;
+      }
+      onLog(`Servera atbilde: ${res.status}, gaida...`, "pending");
+    } catch (err) {
+      if (err.name === "AbortError" || signal.aborted) break;
+      onLog(
+        attempt === 0
+          ? "Serveris tiek inicializēts..."
+          : `Gaida serveri... (${(attempt + 1) * 4}s)`,
+        "pending"
+      );
+    }
+    attempt++;
+  }
+}
+
 /* Free-tier hosts (Render) sleep after inactivity; the first request wakes the
  * container and can return 502/503/504 or fail outright for ~30-50s. Retry a
  * few times so the cold start is invisible to the user. onWake fires once when
@@ -213,6 +244,7 @@ export default function InvoiceReview() {
   const [busy, setBusy] = useState(false);
   const [serverProblems, setServerProblems] = useState(null);
   const [toast, setToast] = useState(null);
+  const [statusLog, setStatusLog] = useState([]); // live health-poll messages during extraction
   const fileRef = useRef(null);
 
   const rec = useMemo(() => reconcile(ext), [ext]);
@@ -241,6 +273,21 @@ export default function InvoiceReview() {
     setServerProblems(null);
     if (!apiBase) { setToast({ kind: "error", msg: "Servera adrese nav konfigurēta. Iestatiet VITE_API_BASE vidē vai ievadiet to zem zobrata ikonas." }); return; }
     setBusy(true);
+    setStatusLog([]);
+
+    // Start health polling concurrently — gives live status under the spinner.
+    // addLog replaces the last "pending" entry in-place to avoid stacking
+    // identical "Gaida serveri…" lines; a new kind always appends a new row.
+    const ac = new AbortController();
+    const addLog = (msg, kind) =>
+      setStatusLog((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.kind === "pending" && kind === "pending")
+          return [...prev.slice(0, -1), { msg, kind, id: last.id }];
+        return [...prev, { msg, kind, id: `${Date.now()}-${Math.random()}` }];
+      });
+    pollHealth(`${apiBase.replace(/\/$/, "")}/health`, addLog, ac.signal).catch(() => {});
+
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -256,7 +303,10 @@ export default function InvoiceReview() {
       setToast({ kind: "info", msg: `Nolasītas ${n} rinda${n === 1 ? "" : "s"} — pārbaudiet zemāk.` });
     } catch (err) {
       setToast({ kind: "error", msg: `${err.message === 'extract 429' ? "Gemini pieprasījumu limits sasniegts" : "Servera kļūda"}` });
-    } finally { setBusy(false); }
+    } finally {
+      ac.abort();   // stop health polling regardless of outcome
+      setBusy(false);
+    }
   };
 
   const onGenerate = async () => {
@@ -373,7 +423,35 @@ export default function InvoiceReview() {
           {!ext ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
               {busy ? (
-                <Loader2 size={100} className="animate-spin text-[#6f6a5f]" />
+                <div className="flex flex-col items-center gap-5">
+                  <Loader2 size={100} className="animate-spin text-[#6f6a5f]" />
+                  {statusLog.length > 0 && (
+                    <div className="flex flex-col gap-1.5 text-left w-full max-w-[300px]">
+                      {statusLog.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`flex items-center gap-2 text-[12px] ${
+                            entry.kind === "ok"
+                              ? "text-[#2f6b4f]"
+                              : entry.kind === "error"
+                              ? "text-[#a3331f]"
+                              : "text-[#6f6a5f]"
+                          }`}
+                          style={mono}
+                        >
+                          {entry.kind === "ok" ? (
+                            <CheckCircle2 size={13} className="shrink-0" />
+                          ) : entry.kind === "error" ? (
+                            <AlertCircle size={13} className="shrink-0" />
+                          ) : (
+                            <Loader2 size={13} className="animate-spin shrink-0" />
+                          )}
+                          <span>{entry.msg}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
                   <h2 className="text-[19px] font-semibold mt-3.5 mb-0 text-[#1c1b17]" style={serif}>Vēl nav ko pārbaudīt</h2>
