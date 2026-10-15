@@ -33,7 +33,10 @@ const describeError = (err, keys = {}) => {
   return [keys[err.status] ?? "errors.server", { status: err.status, detail: err.detail }];
 };
 
-const isPdf = (file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+const countProblems = (p) =>
+  (p?.reconcile_errors?.length ?? 0) + (p?.validation_errors?.length ?? 0) + (p?.validation_warnings?.length ?? 0);
+
+const isPdf =(file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 
 const downloadBlob = (blob, filename) => {
   const url = URL.createObjectURL(blob);
@@ -107,11 +110,17 @@ export default function InvoiceReview() {
 
     setBusy(true);
     try {
-      const blob = await generateXml(ext, {
+      const { blob, problems } = await generateXml(ext, {
         onWake: () => notify("info", "toast.wakingGenerate", undefined, { persist: true }),
       });
       downloadBlob(blob, `${String(ext.invoice_id || "invoice").replace(/\s+/g, "_")}.xml`);
-      notify("ok", "toast.generated");
+      const problemCount = countProblems(problems);
+      if (problemCount > 0) {
+        setServerProblems(problems);
+        notify("info", "toast.generatedWithProblems", { count: problemCount }, { persist: true });
+      } else {
+        notify("ok", "toast.generated");
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 422) {
         setServerProblems(err.body);

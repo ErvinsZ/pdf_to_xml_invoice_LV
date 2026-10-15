@@ -4,7 +4,6 @@ import { AlertCircle, AlertTriangle } from "lucide-react";
 const BUTTON_VARIANTS = {
   primary: "bg-ink text-paper px-3.5 py-2 text-[13.5px] rounded-lg active:scale-[0.98] transition-transform",
   secondary: "bg-white text-ink border border-line px-2.5 py-1.5 text-xs rounded-md hover:bg-soft transition-colors",
-  danger: "bg-danger text-white px-2.5 py-1.5 text-xs rounded-md hover:opacity-90 transition-opacity",
 };
 
 export function Button({ variant = "secondary", className = "", ...props }) {

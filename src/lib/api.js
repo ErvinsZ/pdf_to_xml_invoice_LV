@@ -103,8 +103,20 @@ export async function extractInvoice(file, { onWake } = {}) {
   return data.extraction ?? data;
 }
 
-/* POST /generate — returns the XML as a Blob. A 422 (rejected invoice) throws
- * an ApiError whose body holds the server's problem lists. */
+/* X-Invoice-Problems: JSON problem report sent alongside the XML. */
+const readProblems = (res) => {
+  try {
+    const raw = res.headers.get("X-Invoice-Problems");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+/* POST /generate — returns { blob, problems }. Problems (mismatches, failed
+ * validation rules) don't block the download; `problems` is null when clean.
+ * Older backends answer 422 instead; that throws an ApiError whose body holds
+ * the same problem lists. */
 export async function generateXml(extraction, { onWake } = {}) {
   const res = await fetchWithWakeRetry(
     endpoint("/generate"),
@@ -112,5 +124,5 @@ export async function generateXml(extraction, { onWake } = {}) {
     onWake,
   );
   if (!res.ok) throw await errorFrom(res);
-  return res.blob();
+  return { blob: await res.blob(), problems: readProblems(res) };
 }

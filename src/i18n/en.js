@@ -13,10 +13,6 @@ export default {
     subtitle: "e-invoice review · Horizon",
     generate: "Generate XML",
     errorsBadge: ({ count }) => `${count} ${plural(count, "error", "errors")}`,
-    confirmTitle: "Generate anyway?",
-    confirmBody: ({ count }) => `The invoice still has ${count} ${plural(count, "error", "errors")}. The server will most likely reject it and list the problems.`,
-    confirmSend: "Generate anyway",
-    cancel: "Cancel",
   },
 
   source: {
@@ -86,6 +82,7 @@ export default {
     extracted: ({ count }) => `Extracted ${count} ${plural(count, "line", "lines")} — review below.`,
     rejected: "The server rejected the invoice — see the problems below.",
     generated: "XML generated and downloaded.",
+    generatedWithProblems: ({ count }) => `XML downloaded, but it has ${count} ${plural(count, "problem", "problems")} — check them below before sending it to Horizon.`,
   },
 
   errors: {

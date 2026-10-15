@@ -33,10 +33,10 @@ export default function ReviewPanel({ ext, rec, serverProblems, editor }) {
       {serverProblems && (
         <div className="flex flex-col gap-1.5">
           {(serverProblems.reconcile_errors || []).map((f, i) => (
-            <FlagRow key={`re${i}`} level="error">{t("flags.serverPrefix", { message: f.message })}</FlagRow>
+            <FlagRow key={`re${i}`} level="warning">{t("flags.serverPrefix", { message: f.message })}</FlagRow>
           ))}
           {(serverProblems.validation_errors || []).map((m, i) => (
-            <FlagRow key={`ve${i}`} level="error">{t("flags.validationPrefix", { message: m })}</FlagRow>
+            <FlagRow key={`ve${i}`} level="warning">{t("flags.validationPrefix", { message: m })}</FlagRow>
           ))}
           {(serverProblems.validation_warnings || []).map((m, i) => (
             <FlagRow key={`vw${i}`} level="warning">{m}</FlagRow>

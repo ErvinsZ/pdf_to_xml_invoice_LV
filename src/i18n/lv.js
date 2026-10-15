@@ -13,10 +13,6 @@ export default {
     subtitle: "e-rēķinu pārbaude · Horizon",
     generate: "Izveidot XML",
     errorsBadge: ({ count }) => `${count} ${plural(count, "kļūda", "kļūdas")}`,
-    confirmTitle: "Izveidot tik un tā?",
-    confirmBody: ({ count }) => `Rēķinā joprojām ir ${count} ${plural(count, "kļūda", "kļūdas")}. Serveris, visticamāk, to noraidīs un parādīs problēmas.`,
-    confirmSend: "Izveidot tik un tā",
-    cancel: "Atcelt",
   },
 
   source: {
@@ -86,6 +82,7 @@ export default {
     extracted: ({ count }) => `Nolasītas ${count} ${plural(count, "rinda", "rindas")} — pārbaudiet zemāk.`,
     rejected: "Serveris noraidīja rēķinu — skatiet problēmas zemāk.",
     generated: "XML izveidots un lejupielādēts.",
+    generatedWithProblems: ({ count }) => `XML lejupielādēts, taču tajā ir ${count} ${plural(count, "problēma", "problēmas")} — pārbaudiet tās zemāk pirms nosūtīšanas uz Horizon.`,
   },
 
   errors: {
