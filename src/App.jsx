@@ -1,15 +1,10 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
-import InvoiceReview from './InvoiceReview'
+import I18nProvider from "./i18n/I18nProvider";
+import InvoiceReview from "./InvoiceReview";
 
-function App() {
-
+export default function App() {
   return (
-    <InvoiceReview/>
-  )
+    <I18nProvider>
+      <InvoiceReview />
+    </I18nProvider>
+  );
 }
-
-export default App
